@@ -1,14 +1,19 @@
 #!/usr/bin/env ruby
 
 require 'lib/flickrscroller'
-orientation, size = nil, nil
-path = File.join(ENV['HOME'], '.scrollrrc')
-unless File.exist? path
-  orientation, size = :horizontal, :medium
-  File.open(path, 'w').write "horizontal\nmedium"
-else
-  orientation, size = File.open(path).read.split.map {|x| x.to_sym}
-end
 
-fs = Interface.new orientation, size
-fs.show
+if __FILE__ == $0
+  options = {}
+
+  path = File.join(ENV['HOME'], '.scrollr.conf')
+  unless File.exist? path
+    options.merge!({ 'orientation' => 'horizontal', 'size' => 'medium',
+                    'position'    => 'bottom' })
+    File.open(path, 'w') { |f| f << options.to_yaml }
+  else
+    options.merge! YAML.load(open(path))
+  end
+
+  fs = Interface.new options
+  fs.show
+end

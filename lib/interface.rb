@@ -1,9 +1,10 @@
 class Interface < Gtk::Window
   Parameters = Struct.new(:aspect, :resize_to, :compare_to, :child, :add, :remove, :pack_method)
-  Sizes = { :tiny => 45, :small => 90, :medium => 120, :large => 200 }
+  SIZES = { :tiny => 45, :small => 90, :medium => 120, :large => 200 }
   VERSION = "0.1"
-  
-  def initialize(orientation=:horizontal, size=:small)
+
+  def initialize(options={ 'orientation' => 'horizontal', 'size' => 'tiny',
+                           'position' => 'bottom'})
     super()
     @fixed = Gtk::Fixed.new
     @infolabel = Gtk::Label.new
@@ -15,10 +16,10 @@ class Interface < Gtk::Window
     @scroller_thr = nil
     @scrolling = false
     @combined_size = 0
-    @width = 0
-    @height = 0
-    @orientation = orientation
-    @used_size = size
+    @x, @y, @width, @height = 0, 0
+    @orientation = options['orientation'].to_sym
+    @used_size   = options['size'].to_sym
+    @position    = options['position'].to_sym
     @ag = Gtk::AccelGroup.new
     @params = Parameters.new
 
@@ -36,13 +37,23 @@ class Interface < Gtk::Window
 
     # Creates image container according to Scrollr's orientation
     case @orientation
-    when :horizontal then 
-        @picturebox = Gtk::HBox.new false, 1
-        @width, @height = Gdk.screen_width, Sizes[@used_size]
-        #@width = 1280 if @width > 1280
-    when :vertical   then 
+    when :horizontal then
+      @picturebox = Gtk::HBox.new false, 1
+      @width, @height = Gdk.screen_width, SIZES[@used_size]
+      @x, @y = if @position == :top
+                 [0, 0]
+               else
+                 [0, Gdk.screen_height - SIZES[@used_size]]
+               end
+      #@width = 1280 if @width > 1280
+    when :vertical   then
       @picturebox = Gtk::VBox.new false, 1
-      @width, @height = Sizes[@used_size], Gdk.screen_height
+      @width, @height = SIZES[@used_size], Gdk.screen_height
+      @x, @y = if @position == :left
+                 [0, 0]
+               else
+                 [Gdk.screen_width - SIZES[@used_size], 0]
+               end
     end
 
     # Creates "Interaction Box", for lack of a better name. It holds
@@ -63,15 +74,16 @@ class Interface < Gtk::Window
     set_decorated false
     set_size_request @width, @height
     resize @width, @height
+    move   @x, @y
     set_title "Scrollr"
 
     # Adds all widgets to the main window and performs adjustments
     add @fixed
     @fixed.put @picturebox, 0, 0
     @picturebox.set_size_request @width, @height
-    @fixed.put @interactionbox, 20, @height - 60
-    @fixed.put @waitingbox, 20, @height - 60
-    
+    @fixed.put @interactionbox, 20, @height / 2 - 20
+    @fixed.put @waitingbox, 20, @height / 2 - 5
+
     #set color
     set_app_paintable true
     #@window.modify_bg(Gtk::StateType.new(0), Gdk::Color.parse('black'))
@@ -89,7 +101,7 @@ class Interface < Gtk::Window
             @interactionbox.visible = false
         end
     end
-    @ag.connect(Gdk::Keyval::GDK_Q, Gdk::Window::CONTROL_MASK, Gtk::ACCEL_VISIBLE)  do 
+    @ag.connect(Gdk::Keyval::GDK_Q, Gdk::Window::CONTROL_MASK, Gtk::ACCEL_VISIBLE)  do
         @scroller_thr.kill if @scroller_thr
         Gtk.main_quit
     end
@@ -98,7 +110,7 @@ class Interface < Gtk::Window
 
   # Connects signals for all desired widget behaviors.
   def connect_signals
-    add_events Gdk::Event::BUTTON_PRESS_MASK 
+    add_events Gdk::Event::BUTTON_PRESS_MASK
     signal_connect('button_press_event') do |w, e|
         begin_move_drag e.button, e.x_root, e.y_root, e.time
     end
@@ -111,7 +123,12 @@ class Interface < Gtk::Window
         GC.start
       end
 
-      @scroller = Scroller.new w.text.strip, :small
+      size = if @size_used == :tiny || @size_used == :small
+               :thumb
+             else
+               :small
+             end
+      @scroller = Scroller.new(w.text.strip, size)
       @scroller.add_observer self
       Thread.abort_on_exception = true
       @scroller_thr = Thread.new(@scroller) { |scroller| @scroller.scroll }
@@ -130,7 +147,7 @@ class Interface < Gtk::Window
     end
 
     signal_connect('screen-changed') { |w, e| screen_changed w }
-  end    
+  end
 
   def screen_changed(w)
     screen = w.screen
@@ -147,7 +164,7 @@ class Interface < Gtk::Window
   def set_parameters
     case @orientation
     when :horizontal then
-      @params.aspect = :height 
+      @params.aspect = :height
       @params.resize_to = @height
       @params.compare_to = @width
       @params.child = Proc.new  { @picturebox.children.first }
@@ -177,7 +194,7 @@ class Interface < Gtk::Window
     if args[:event] == :new_image
       start_scrolling unless @scrolling
       image = args[:data]
-          
+
       image.resize! @params.aspect => @params.resize_to
       @combined_size += @params.add.call(image)
       if @combined_size > @params.compare_to

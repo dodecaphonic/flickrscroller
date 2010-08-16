@@ -2,18 +2,18 @@ require 'date'
 
 class Scroller
   include Observable
-  ApiKey = nil
-  SharedSecret = nil
-  CacheSize = 5
+  APIKEY = nil
+  SHAREDSECRET = nil
+  CACHESIZE = 5
 
   def initialize(criteria, size)
     @size = size
     @criteria = criteria
     @cache = []
 
-    unless ApiKey.nil? and SharedSecret.nil?
-      FlickRaw.api_key = ApiKey
-      FlickRaw.shared_secret = SharedSecret
+    unless APIKEY.nil? and SHAREDSECRET.nil?
+      FlickRaw.api_key = APIKEY
+      FlickRaw.shared_secret = SHAREDSECRET
     end
   end
 
@@ -25,7 +25,6 @@ class Scroller
       photos = flickr.interestingness.getList
     end
     photos.each { |photo| add_photo photo }
-    p "the end"
   end
 
   # Returns number of images cached
@@ -35,14 +34,14 @@ class Scroller
 
   private
   def add_photo(photo)
-    sizes = flickr.photos.getSizes :photo_id => photo.id
-    tags  = flickr.tags.getListPhoto(:photo_id => photo.id).tags
-    wanted = @size.to_s.capitalize
-    original = sizes.find { |s| s.label == wanted }
-    url = original.source.gsub('\\', '').gsub(/\s+/, '')
-    image = open(url).read
+    begin
+      sizes = flickr.photos.getSizes :photo_id => photo.id
+      tags  = flickr.tags.getListPhoto(:photo_id => photo.id).tags
+      wanted = @size.to_s.capitalize
+      original = sizes.find { |s| s.label == wanted }
+      url = original.source.gsub('\\', '').gsub(/\s+/, '')
 
-    if image
+      image = open(url).read
       flickr_url = "http://www.flickr.com/photos/#{photo.owner}/#{photo.id}"
       image = Image.new(image, :photo_id => photo.id,
                         :user => photo.owner, :url => flickr_url,
@@ -50,12 +49,13 @@ class Scroller
       @cache << image
 
       changed
-      unless @cache.size < CacheSize
+      if @cache.size > CACHESIZE
         notify_observers :event => :new_image, :data => @cache.first
         @cache.delete @cache.first
       else
         notify_observers :event => :caching, :data => nil
       end
+    rescue
     end
   end
 end

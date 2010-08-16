@@ -1,6 +1,6 @@
 class ImageWidget < Gtk::DrawingArea
   TextSize = { :tiny => 10, :small => 12, :normal => 14, :large => 18 }
-  
+
   def initialize(image, params=nil)
     super()
     @image = image
@@ -8,8 +8,8 @@ class ImageWidget < Gtk::DrawingArea
     @text_size = :small
 
     if params
-      params.each do |k, v| 
-        @show_text = v if k == :show_text 
+      params.each do |k, v|
+        @show_text = v if k == :show_text
         @text_size = v if k == :text_size
       end
     end
@@ -18,8 +18,8 @@ class ImageWidget < Gtk::DrawingArea
 
   private
   def connect_signals
-    set_events(Gdk::Event::ENTER_NOTIFY_MASK | 
-               Gdk::Event::LEAVE_NOTIFY_MASK | 
+    set_events(Gdk::Event::ENTER_NOTIFY_MASK |
+               Gdk::Event::LEAVE_NOTIFY_MASK |
                Gdk::Event::BUTTON_PRESS_MASK)
     signal_connect("enter_notify_event") do |x, y, data|
       cr = window.create_cairo_context
@@ -55,7 +55,7 @@ class ImageWidget < Gtk::DrawingArea
         @image.tags.each_with_index do |t, i|
           break if i > 2
           y = last_y + 15
-          pa.text = t
+          pa.text = t.to_s
           cr.move_to 12, y
           cr.show_pango_layout pa
           last_y = y
@@ -68,8 +68,8 @@ class ImageWidget < Gtk::DrawingArea
     end
 
     signal_connect("expose_event") { |w, e| expose(w, e) }
-    signal_connect("button_press_event") do |w, e| 
-      Kernel.system "firefox", "-new-window", @image.url 
+    signal_connect("button_press_event") do |w, e|
+      Kernel.system "firefox", "-new-window", @image.url
       false
     end
   end
